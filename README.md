@@ -36,7 +36,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ### Node.js 18+
 Recomendado via [nvm](https://github.com/nvm-sh/nvm):
 ```bash
-nvm install 18 && nvm use 18
+nvm install 24 && nvm use 24
 ```
 
 ### Dependências de sistema (Linux apenas)
