@@ -2,11 +2,12 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: 540px;
+  flex: 1;
+  min-height: min(100vh, 100%);
   background: var(--bg);
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  overflow: hidden;
+  overflow-x: hidden;
   position: relative;
 }
 
@@ -148,6 +149,7 @@
 .big-timer.work .timer-label { color: var(--accent-work); }
 .big-timer.lunch .timer-label { color: var(--accent-lunch); }
 .big-timer.complete .timer-label { color: var(--accent-work); }
+.big-timer.frozen .timer-label { color: var(--text-mid); }
 
 .timer-display {
   font-size: 46px;
@@ -161,6 +163,65 @@
 .big-timer.work .timer-display { color: var(--text); }
 .big-timer.lunch .timer-display { color: var(--accent-lunch); }
 .big-timer.complete .timer-display { color: var(--accent-work); }
+.big-timer.frozen .timer-display { color: var(--text-mid); }
+
+/* ── WORKDAY STOP / END TIME ── */
+.workday-tracking-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.workday-tracking-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.workday-end-row {
+  justify-content: space-between;
+}
+
+.workday-end-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.workday-end-caption {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.workday-end-row input[type="time"] {
+  width: 100%;
+  max-width: 140px;
+}
+
+.btn-stop-track:not(:disabled) {
+  border-color: rgba(255, 170, 0, 0.35);
+  color: var(--accent-lunch);
+}
+
+.btn-resume-track:disabled {
+  opacity: 0.35;
+}
+
+.btn-apply-end {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  font-size: 11px;
+}
 
 /* ── PROGRESS ── */
 .progress-block {
@@ -206,6 +267,31 @@
 .progress-footer {
   font-size: 9px;
   color: var(--text-dim);
+}
+
+.progress-footer.lunch-done-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.lunch-done-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: var(--text-mid);
+  cursor: pointer;
+  user-select: none;
+}
+
+.lunch-done-check input {
+  accent-color: var(--accent-lunch);
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
 }
 
 /* ── CONTROLS ── */
@@ -397,12 +483,13 @@
 /* ── FOOTER ── */
 .footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 8px 16px 10px;
+  gap: 6px 10px;
+  row-gap: 8px;
+  padding: 10px 14px 14px;
   border-top: 1px solid var(--border);
-  white-space: nowrap;
-  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .live-clock {
@@ -422,8 +509,8 @@
   font-size: 10px;
   color: var(--text-dim);
   letter-spacing: 0.04em;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 120px;
 }
 
 .footer-toggle {
@@ -432,7 +519,8 @@
   gap: 4px;
   font-size: 10px;
   color: var(--text-dim);
-  margin-left: auto;
+  flex-basis: 100%;
+  margin-left: 0;
 }
 
 .dim { color: var(--text-dim); }

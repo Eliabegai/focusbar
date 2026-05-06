@@ -8,6 +8,11 @@ function getCurrentTime(): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
+function formatClockFromMs(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export default function App() {
   const {
     state,
@@ -16,6 +21,10 @@ export default function App() {
     stopwatchRemainingDisplay,
     startWorkday,
     toggleLunch,
+    toggleLunchDoneManual,
+    freezeWorkdayTracking,
+    resumeWorkdayTracking,
+    applyWorkdayEndTime,
     setMode,
     toggleRunning,
     resetPomodoro,
@@ -28,10 +37,12 @@ export default function App() {
   const [trayAlwaysVisible, setTrayAlwaysVisible] = useState(true);
   const [stopwatchRetroMinutes, setStopwatchRetroMinutes] = useState(0);
   const [stopwatchTargetMinutes, setStopwatchTargetMinutes] = useState(0);
+  const [workdayEndInput, setWorkdayEndInput] = useState(getCurrentTime());
 
   const handleStartWorkday = () => {
     startWorkday(startInput);
     setWorkdayStarted(true);
+    setWorkdayEndInput(getCurrentTime());
   };
 
   function calcExitTime(
@@ -52,19 +63,35 @@ export default function App() {
       ? Math.min(state.workdayElapsed / (state.workday.totalWork * 60), 1)
       : 0;
 
+  const lunchTargetSec = state.workday.lunchDuration * 60;
+  const lunchDoneByTimer =
+    lunchTargetSec > 0 && state.lunchElapsed >= lunchTargetSec;
+  const lunchDoneEffective =
+    state.lunchDoneManual || lunchDoneByTimer;
   const lunchProgress =
-    state.workday.lunchDuration > 0
-      ? Math.min(state.lunchElapsed / (state.workday.lunchDuration * 60), 1)
+    lunchTargetSec > 0
+      ? lunchDoneEffective
+        ? 1
+        : Math.min(state.lunchElapsed / lunchTargetSec, 1)
       : 0;
+  const lunchElapsedDisplay = lunchDoneEffective
+    ? lunchTargetSec
+    : state.lunchElapsed;
 
   const pomodoroLimit =
     state.pomodoroPhase === "focus" ? 25 * 60 : 5 * 60;
   const pomodoroProgress = Math.min(pomodoroElapsedDisplay / pomodoroLimit, 1);
-  const lunchRemaining = Math.max(0, state.workday.lunchDuration * 60 - state.lunchElapsed);
+  const lunchRemaining = lunchDoneEffective
+    ? 0
+    : Math.max(0, lunchTargetSec - state.lunchElapsed);
   const remaining = Math.max(0, state.workday.totalWork * 60 - state.workdayElapsed) + lunchRemaining;
   const workdaySecondary = workdayStarted
     ? state.workdayComplete
-      ? "Jornada 100% concluida"
+      ? lunchDoneEffective
+        ? "Jornada e almoço 100% no app"
+        : "Jornada 100% concluida"
+      : state.workdayFrozen
+      ? `Contagem pausada${state.workdayClosedAtMs ? ` · ref. ${formatClockFromMs(state.workdayClosedAtMs)}` : ""}`
       : state.isOnLunch
       ? `Jornada em pausa (almoco ${Math.round(lunchProgress * 100)}%)`
       : `Jornada ${Math.round(workProgress * 100)}% • falta ${formatTimeHM(Math.max(0, remaining))}`
@@ -83,6 +110,8 @@ export default function App() {
         }`
       : state.workdayComplete
       ? "Jornada concluida"
+      : state.workdayFrozen
+      ? `Contagem pausada · ${formatTime(state.workdayElapsed)}`
       : state.isOnLunch
       ? `Almoco • ${formatTime(state.lunchElapsed)}`
       : `Jornada ativa • ${formatTime(state.workdayElapsed)}`;
@@ -101,7 +130,10 @@ export default function App() {
     state.mode,
     state.workdayElapsed,
     state.lunchElapsed,
+    state.lunchDoneManual,
     state.workdayComplete,
+    state.workdayFrozen,
+    state.workdayClosedAtMs,
     state.isOnLunch,
     pomodoroElapsedDisplay,
     state.pomodoroPhase,
@@ -172,16 +204,20 @@ export default function App() {
           ) : (
             <>
               {/* Big Timer */}
-              <div className={`big-timer ${state.workdayComplete ? "complete" : state.isOnLunch ? "lunch" : "work"}`}>
+              <div
+                className={`big-timer ${state.workdayComplete ? "complete" : state.isOnLunch ? "lunch" : state.workdayFrozen ? "frozen" : "work"}`}
+              >
                 <div className="timer-label">
                   {state.workdayComplete
                     ? "JORNADA COMPLETA"
+                    : state.workdayFrozen
+                    ? "CONTAGEM PAUSADA"
                     : state.isOnLunch
                     ? "ALMOÇO"
                     : "TRABALHANDO"}
                 </div>
                 <div className="timer-display">
-                  {state.isOnLunch
+                  {state.isOnLunch && !state.workdayFrozen
                     ? formatTime(state.lunchElapsed)
                     : formatTime(state.workdayElapsed)}
                 </div>
@@ -228,7 +264,8 @@ export default function App() {
                 <div className="progress-header">
                   <span className="progress-name">Almoço</span>
                   <span className="progress-val">
-                    {formatTimeHM(state.lunchElapsed)} / 1h00
+                    {formatTimeHM(lunchElapsedDisplay)} /{" "}
+                    {formatTimeHM(lunchTargetSec)}
                   </span>
                 </div>
                 <div className="progress-track">
@@ -237,14 +274,74 @@ export default function App() {
                     style={{ width: `${lunchProgress * 100}%` }}
                   />
                 </div>
+                <div className="progress-footer lunch-done-footer">
+                  <span className="dim">
+                    {lunchDoneEffective
+                      ? "✓ Completo!"
+                      : `faltam ${formatTimeHM(lunchRemaining)}`}
+                  </span>
+                  {!lunchDoneByTimer && (
+                    <label className="lunch-done-check">
+                      <input
+                        type="checkbox"
+                        checked={state.lunchDoneManual}
+                        onChange={toggleLunchDoneManual}
+                      />
+                      <span>Almoço realizado (manual)</span>
+                    </label>
+                  )}
+                </div>
               </div>
+
+              {!state.workdayComplete && (
+                <div className="workday-tracking-panel">
+                  <div className="workday-tracking-row">
+                    <button
+                      type="button"
+                      className="btn-control btn-stop-track"
+                      onClick={freezeWorkdayTracking}
+                      disabled={state.workdayFrozen}
+                      title="Congela o relógio no valor atual"
+                    >
+                      Parar contagem
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost btn-resume-track"
+                      onClick={resumeWorkdayTracking}
+                      disabled={!state.workdayFrozen}
+                      title="Volta a seguir o relógio do sistema"
+                    >
+                      Retomar
+                    </button>
+                  </div>
+                  <div className="workday-tracking-row workday-end-row">
+                    <label className="workday-end-label">
+                      <span className="workday-end-caption">Horário de saída / fim</span>
+                      <input
+                        type="time"
+                        value={workdayEndInput}
+                        onChange={(e) => setWorkdayEndInput(e.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-primary btn-apply-end"
+                      onClick={() => applyWorkdayEndTime(workdayEndInput)}
+                      title="Recalcula trabalho até esse horário (desconta almoço registrado)"
+                    >
+                      Calcular
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Controls */}
               <div className="controls">
                 <button
                   className={`btn-control ${state.isOnLunch ? "lunch-active" : ""}`}
                   onClick={toggleLunch}
-                  disabled={state.workdayComplete}
+                  disabled={state.workdayComplete || state.workdayFrozen}
                 >
                   {state.isOnLunch ? "✓ Voltei" : "🍽 Almoço"}
                 </button>
@@ -382,6 +479,8 @@ export default function App() {
           {state.mode === "workday" && workdayStarted
             ? state.workdayComplete
               ? "✓ Jornada ok"
+              : state.workdayFrozen
+              ? "⏸ Contagem pausada"
               : `${Math.round(workProgress * 100)}% da jornada`
             : state.mode === "pomodoro"
             ? `#${state.pomodoroCount + 1}`
@@ -403,9 +502,9 @@ export default function App() {
 
 function LiveClock() {
   const [time, setTime] = useState(getCurrentTime());
-  useState(() => {
+  useEffect(() => {
     const id = setInterval(() => setTime(getCurrentTime()), 1000);
     return () => clearInterval(id);
-  });
+  }, []);
   return <span className="live-clock">{time}</span>;
 }

@@ -21,6 +21,12 @@ export interface TimerState {
   lunchSessions: number;   // quantas vezes foi almoçar
   isOnLunch: boolean;
   lunchStartTimestamp: number | null; // quando iniciou o almoço atual
+  /** Registro manual: barra de almoço 100% sem usar o timer do botão Almoço */
+  lunchDoneManual: boolean;
+  /** Pausa a contagem pelo relógio (Parar / horário final); Retomar volta a seguir o tempo real */
+  workdayFrozen: boolean;
+  /** Momento usado ao pausar ou ao aplicar horário final (para exibir no app) */
+  workdayClosedAtMs: number | null;
   workdayComplete: boolean;
   // Pomodoro
   pomodoroPhase: PomodoroPhase;
@@ -41,16 +47,66 @@ function calcWorkElapsed(
   startTimestamp: number,
   lunchElapsedAlready: number,
   isOnLunch: boolean,
-  lunchStartTimestamp: number | null
+  lunchStartTimestamp: number | null,
+  nowMs: number = Date.now()
 ): number {
-  const totalRaw = Math.floor((Date.now() - startTimestamp) / 1000);
-  // desconta almoço já consumido
+  const totalRaw = Math.floor((nowMs - startTimestamp) / 1000);
   let lunchSoFar = lunchElapsedAlready;
-  // se está no almoço agora, desconta o tempo atual de almoço também
   if (isOnLunch && lunchStartTimestamp) {
-    lunchSoFar += Math.floor((Date.now() - lunchStartTimestamp) / 1000);
+    lunchSoFar += Math.floor((nowMs - lunchStartTimestamp) / 1000);
   }
   return Math.max(0, totalRaw - lunchSoFar);
+}
+
+/** Congela almoço/trabalho como num instante fixo (fecha sessão de almoço no estado). */
+function snapshotWorkdayAt(prev: TimerState, nowMs: number) {
+  const cap = prev.workday.lunchDuration * 60;
+  let lunchElapsed = prev.lunchElapsed;
+  const lunchStartTs = prev.lunchStartTimestamp;
+
+  if (prev.isOnLunch && lunchStartTs !== null) {
+    lunchElapsed =
+      prev.lunchBaseElapsed + Math.floor((nowMs - lunchStartTs) / 1000);
+    if (lunchElapsed >= cap) {
+      lunchElapsed = cap;
+    }
+  }
+
+  lunchElapsed = Math.min(Math.max(0, lunchElapsed), cap);
+
+  const raw = Math.floor((nowMs - prev.workday.startTimestamp) / 1000);
+  const workSeconds = Math.max(0, raw - lunchElapsed);
+  const totalRequired = prev.workday.totalWork * 60;
+  const workdayComplete = workSeconds >= totalRequired;
+
+  return {
+    workdayElapsed: workdayComplete ? totalRequired : workSeconds,
+    lunchElapsed,
+    lunchBaseElapsed: lunchElapsed,
+    isOnLunch: false,
+    lunchStartTimestamp: null as number | null,
+    workdayComplete,
+  };
+}
+
+function parseTodayEndMs(startTimestamp: number, endTimeHHMM: string): number | null {
+  const parts = endTimeHHMM.trim().split(":");
+  if (parts.length < 2) return null;
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+
+  const end = new Date();
+  end.setHours(h, m, 0, 0);
+  let endMs = end.getTime();
+  const now = Date.now();
+  if (endMs > now) endMs = now;
+  if (endMs < startTimestamp) {
+    end.setDate(end.getDate() + 1);
+    endMs = Math.min(end.getTime(), now);
+  }
+  if (endMs < startTimestamp) return null;
+  return endMs;
 }
 
 export function useTimer() {
@@ -69,6 +125,9 @@ export function useTimer() {
     lunchSessions: 0,
     isOnLunch: false,
     lunchStartTimestamp: null,
+    lunchDoneManual: false,
+    workdayFrozen: false,
+    workdayClosedAtMs: null,
     workdayComplete: false,
     pomodoroPhase: "focus",
     pomodoroSessionStart: null,
@@ -96,6 +155,7 @@ export function useTimer() {
       // --- WORKDAY ---
       if (prev.workday.startTimestamp && !prev.workdayComplete) {
         if (prev.workdayComplete || !prev.workday.startTimestamp) return prev;
+        if (prev.workdayFrozen) return prev;
 
         // Almoço em andamento: atualiza lunchElapsed em tempo real
         let newLunchElapsed = prev.lunchElapsed;
@@ -133,7 +193,8 @@ export function useTimer() {
           prev.workday.startTimestamp,
           prev.lunchElapsed,
           false,
-          null
+          null,
+          Date.now()
         );
 
         const totalRequired = prev.workday.totalWork * 60;
@@ -283,12 +344,69 @@ export function useTimer() {
       lunchSessions: 0,
       isOnLunch: false,
       lunchStartTimestamp: null,
+      lunchDoneManual: false,
+      workdayFrozen: false,
+      workdayClosedAtMs: null,
       workdayComplete: false,
+    }));
+  }, []);
+
+  const freezeWorkdayTracking = useCallback(() => {
+    const now = Date.now();
+    setState((prev) => {
+      if (
+        !prev.workday.startTimestamp ||
+        prev.workdayComplete ||
+        prev.workdayFrozen
+      ) {
+        return prev;
+      }
+      const snap = snapshotWorkdayAt(prev, now);
+      return {
+        ...prev,
+        ...snap,
+        workdayFrozen: true,
+        workdayClosedAtMs: now,
+      };
+    });
+  }, []);
+
+  const resumeWorkdayTracking = useCallback(() => {
+    setState((prev) => {
+      if (!prev.workdayFrozen || prev.workdayComplete) return prev;
+      return {
+        ...prev,
+        workdayFrozen: false,
+        workdayClosedAtMs: null,
+      };
+    });
+  }, []);
+
+  const applyWorkdayEndTime = useCallback((endTimeHHMM: string) => {
+    setState((prev) => {
+      if (!prev.workday.startTimestamp || prev.workdayComplete) return prev;
+      const endMs = parseTodayEndMs(prev.workday.startTimestamp, endTimeHHMM);
+      if (endMs === null) return prev;
+      const snap = snapshotWorkdayAt(prev, endMs);
+      return {
+        ...prev,
+        ...snap,
+        workdayFrozen: true,
+        workdayClosedAtMs: endMs,
+      };
+    });
+  }, []);
+
+  const toggleLunchDoneManual = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      lunchDoneManual: !prev.lunchDoneManual,
     }));
   }, []);
 
   const toggleLunch = useCallback(() => {
     setState((prev) => {
+      if (prev.workdayFrozen || prev.workdayComplete) return prev;
       if (prev.isOnLunch) {
         // Voltando do almoço: congela o lunchElapsed
         const lunchSoFar = prev.lunchStartTimestamp
@@ -454,6 +572,10 @@ export function useTimer() {
     resetStopwatch,
     configureStopwatch,
     updateWorkdayConfig,
+    toggleLunchDoneManual,
+    freezeWorkdayTracking,
+    resumeWorkdayTracking,
+    applyWorkdayEndTime,
   };
 }
 
