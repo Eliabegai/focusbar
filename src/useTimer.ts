@@ -12,11 +12,12 @@ export interface WorkdayConfig {
 
 export interface TimerState {
   mode: Mode;
-  isRunning: boolean;
+  isRunning: boolean; // controla pomodoro/cronometro
   // Workday
   workday: WorkdayConfig;
   workdayElapsed: number;  // segundos trabalhados (excluindo almoço)
   lunchElapsed: number;    // segundos de almoço consumidos
+  lunchBaseElapsed: number; // acumulado antes do almoço atual
   lunchSessions: number;   // quantas vezes foi almoçar
   isOnLunch: boolean;
   lunchStartTimestamp: number | null; // quando iniciou o almoço atual
@@ -29,6 +30,7 @@ export interface TimerState {
   // Stopwatch
   stopwatchBaseElapsed: number;        // elapsed acumulado antes de pausar
   stopwatchSessionStart: number | null; // timestamp real do início
+  stopwatchTargetSeconds: number; // 0 = sem regressivo
 }
 
 const POMODORO_FOCUS = 25 * 60;
@@ -63,6 +65,7 @@ export function useTimer() {
     },
     workdayElapsed: 0,
     lunchElapsed: 0,
+    lunchBaseElapsed: 0,
     lunchSessions: 0,
     isOnLunch: false,
     lunchStartTimestamp: null,
@@ -73,6 +76,7 @@ export function useTimer() {
     pomodoroCount: 0,
     stopwatchBaseElapsed: 0,
     stopwatchSessionStart: null,
+    stopwatchTargetSeconds: 0,
   });
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -89,69 +93,15 @@ export function useTimer() {
   // Tick: só atualiza o state lendo timestamps reais — nunca acumula +1
   const tick = useCallback(() => {
     setState((prev) => {
-      if (!prev.isRunning) return prev;
-
-      // --- STOPWATCH ---
-      if (prev.mode === "stopwatch") {
-        if (!prev.stopwatchSessionStart) return prev;
-        const elapsed =
-          prev.stopwatchBaseElapsed +
-          Math.floor((Date.now() - prev.stopwatchSessionStart) / 1000);
-        return { ...prev, stopwatchElapsed: elapsed } as typeof prev & { stopwatchElapsed: number };
-      }
-
-      // --- POMODORO ---
-      if (prev.mode === "pomodoro") {
-        if (!prev.pomodoroSessionStart) return prev;
-        const elapsed =
-          prev.pomodoroBaseElapsed +
-          Math.floor((Date.now() - prev.pomodoroSessionStart) / 1000);
-        const limit =
-          prev.pomodoroPhase === "focus" ? POMODORO_FOCUS : POMODORO_BREAK;
-
-        if (elapsed >= limit) {
-          const newPhase: PomodoroPhase =
-            prev.pomodoroPhase === "focus" ? "break" : "focus";
-          const newCount =
-            prev.pomodoroPhase === "focus"
-              ? prev.pomodoroCount + 1
-              : prev.pomodoroCount;
-          setTimeout(() => {
-            if (newPhase === "break") {
-              notify(
-                "🍅 Pomodoro completo!",
-                "Hora de descansar 5 minutos.",
-                `pomo-break-${newCount}`
-              );
-            } else {
-              notify(
-                "✅ Pausa encerrada!",
-                "Bora focar por mais 25 min.",
-                `pomo-focus-${newCount}`
-              );
-            }
-          }, 0);
-          return {
-            ...prev,
-            pomodoroPhase: newPhase,
-            pomodoroBaseElapsed: 0,
-            pomodoroSessionStart: Date.now(),
-            pomodoroCount: newCount,
-          };
-        }
-
-        return { ...prev, pomodoroElapsed: elapsed } as typeof prev & { pomodoroElapsed: number };
-      }
-
       // --- WORKDAY ---
-      if (prev.mode === "workday") {
+      if (prev.workday.startTimestamp && !prev.workdayComplete) {
         if (prev.workdayComplete || !prev.workday.startTimestamp) return prev;
 
         // Almoço em andamento: atualiza lunchElapsed em tempo real
         let newLunchElapsed = prev.lunchElapsed;
         if (prev.isOnLunch && prev.lunchStartTimestamp) {
           newLunchElapsed =
-            prev.lunchElapsed +
+            prev.lunchBaseElapsed +
             Math.floor((Date.now() - prev.lunchStartTimestamp) / 1000);
 
           // Almoço acabou automaticamente?
@@ -168,6 +118,7 @@ export function useTimer() {
             return {
               ...prev,
               lunchElapsed: prev.workday.lunchDuration * 60,
+              lunchBaseElapsed: prev.workday.lunchDuration * 60,
               isOnLunch: false,
               lunchStartTimestamp: null,
             };
@@ -225,21 +176,69 @@ export function useTimer() {
         return { ...prev, workdayElapsed: newWorkElapsed };
       }
 
+      // --- STOPWATCH ---
+      if (prev.isRunning && prev.mode === "stopwatch") {
+        if (!prev.stopwatchSessionStart) return prev;
+        const elapsed =
+          prev.stopwatchBaseElapsed +
+          Math.floor((Date.now() - prev.stopwatchSessionStart) / 1000);
+        return { ...prev, stopwatchElapsed: elapsed } as typeof prev & { stopwatchElapsed: number };
+      }
+
+      // --- POMODORO ---
+      if (prev.isRunning && prev.mode === "pomodoro") {
+        if (!prev.pomodoroSessionStart) return prev;
+        const elapsed =
+          prev.pomodoroBaseElapsed +
+          Math.floor((Date.now() - prev.pomodoroSessionStart) / 1000);
+        const limit =
+          prev.pomodoroPhase === "focus" ? POMODORO_FOCUS : POMODORO_BREAK;
+
+        if (elapsed >= limit) {
+          const newPhase: PomodoroPhase =
+            prev.pomodoroPhase === "focus" ? "break" : "focus";
+          const newCount =
+            prev.pomodoroPhase === "focus"
+              ? prev.pomodoroCount + 1
+              : prev.pomodoroCount;
+          setTimeout(() => {
+            if (newPhase === "break") {
+              notify(
+                "🍅 Pomodoro completo!",
+                "Hora de descansar 5 minutos.",
+                `pomo-break-${newCount}`
+              );
+            } else {
+              notify(
+                "✅ Pausa encerrada!",
+                "Bora focar por mais 25 min.",
+                `pomo-focus-${newCount}`
+              );
+            }
+          }, 0);
+          return {
+            ...prev,
+            pomodoroPhase: newPhase,
+            pomodoroBaseElapsed: 0,
+            pomodoroSessionStart: Date.now(),
+            pomodoroCount: newCount,
+          };
+        }
+
+        return { ...prev, pomodoroElapsed: elapsed } as typeof prev & { pomodoroElapsed: number };
+      }
+
       return prev;
     });
   }, [notify]);
 
   // Intervalo de 1s — mas o valor real vem sempre do timestamp, não do contador
   useEffect(() => {
-    if (state.isRunning) {
-      tickRef.current = setInterval(tick, 1000);
-    } else {
-      if (tickRef.current) clearInterval(tickRef.current);
-    }
+    tickRef.current = setInterval(tick, 1000);
     return () => {
       if (tickRef.current) clearInterval(tickRef.current);
     };
-  }, [state.isRunning, tick]);
+  }, [tick]);
 
   // Permissão de notificação
   useEffect(() => {
@@ -276,10 +275,11 @@ export function useTimer() {
     setState((prev) => ({
       ...prev,
       mode: "workday",
-      isRunning: true,
+      isRunning: false,
       workday: { ...prev.workday, startTime, startTimestamp },
       workdayElapsed: Math.min(alreadyWorked, prev.workday.totalWork * 60),
       lunchElapsed: 0,
+      lunchBaseElapsed: 0,
       lunchSessions: 0,
       isOnLunch: false,
       lunchStartTimestamp: null,
@@ -292,7 +292,7 @@ export function useTimer() {
       if (prev.isOnLunch) {
         // Voltando do almoço: congela o lunchElapsed
         const lunchSoFar = prev.lunchStartTimestamp
-          ? prev.lunchElapsed +
+          ? prev.lunchBaseElapsed +
             Math.floor((Date.now() - prev.lunchStartTimestamp) / 1000)
           : prev.lunchElapsed;
         return {
@@ -300,12 +300,14 @@ export function useTimer() {
           isOnLunch: false,
           lunchStartTimestamp: null,
           lunchElapsed: Math.min(lunchSoFar, prev.workday.lunchDuration * 60),
+          lunchBaseElapsed: Math.min(lunchSoFar, prev.workday.lunchDuration * 60),
         };
       } else {
         // Saindo para almoço: marca o timestamp de início
         return {
           ...prev,
           isOnLunch: true,
+          lunchBaseElapsed: prev.lunchElapsed,
           lunchStartTimestamp: Date.now(),
           lunchSessions: prev.lunchSessions + 1,
         };
@@ -329,6 +331,7 @@ export function useTimer() {
 
   const toggleRunning = useCallback(() => {
     setState((prev) => {
+      if (prev.mode === "workday") return prev;
       if (prev.isRunning) {
         // Pausando: congela base
         if (prev.mode === "pomodoro") {
@@ -394,9 +397,25 @@ export function useTimer() {
       ...prev,
       stopwatchBaseElapsed: 0,
       stopwatchSessionStart: null,
+      stopwatchTargetSeconds: 0,
       isRunning: false,
     }));
   }, []);
+
+  const configureStopwatch = useCallback(
+    (retroactiveSeconds: number, targetSeconds: number, startNow: boolean) => {
+      const safeRetroactive = Math.max(0, Math.floor(retroactiveSeconds));
+      const safeTarget = Math.max(0, Math.floor(targetSeconds));
+      setState((prev) => ({
+        ...prev,
+        stopwatchBaseElapsed: safeRetroactive,
+        stopwatchTargetSeconds: safeTarget,
+        stopwatchSessionStart: startNow ? Date.now() : null,
+        isRunning: startNow ? prev.mode === "stopwatch" : false,
+      }));
+    },
+    []
+  );
 
   const updateWorkdayConfig = useCallback((config: Partial<WorkdayConfig>) => {
     setState((prev) => ({
@@ -417,17 +436,23 @@ export function useTimer() {
       ? state.stopwatchBaseElapsed +
         Math.floor((Date.now() - state.stopwatchSessionStart) / 1000)
       : state.stopwatchBaseElapsed;
+  const stopwatchRemainingDisplay =
+    state.stopwatchTargetSeconds > 0
+      ? Math.max(0, state.stopwatchTargetSeconds - stopwatchElapsedDisplay)
+      : 0;
 
   return {
     state,
     pomodoroElapsedDisplay,
     stopwatchElapsedDisplay,
+    stopwatchRemainingDisplay,
     startWorkday,
     toggleLunch,
     setMode,
     toggleRunning,
     resetPomodoro,
     resetStopwatch,
+    configureStopwatch,
     updateWorkdayConfig,
   };
 }

@@ -37,10 +37,14 @@
     "windows": [
       {
         "fullscreen": false,
-        "resizable": false,
+        "resizable": true,
         "title": "FocusBar",
-        "width": 320,
-        "height": 450,
+        "width": 380,
+        "height": 560,
+        "minWidth": 380,
+        "minHeight": 560,
+        "maxWidth": 560,
+        "maxHeight": 900,
         "decorations": true,
         "alwaysOnTop": true,
         "transparent": true,

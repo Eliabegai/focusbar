@@ -13,16 +13,21 @@ export default function App() {
     state,
     pomodoroElapsedDisplay,
     stopwatchElapsedDisplay,
+    stopwatchRemainingDisplay,
     startWorkday,
     toggleLunch,
     setMode,
     toggleRunning,
     resetPomodoro,
     resetStopwatch,
+    configureStopwatch,
   } = useTimer();
 
   const [startInput, setStartInput] = useState(getCurrentTime());
   const [workdayStarted, setWorkdayStarted] = useState(false);
+  const [trayAlwaysVisible, setTrayAlwaysVisible] = useState(true);
+  const [stopwatchRetroMinutes, setStopwatchRetroMinutes] = useState(0);
+  const [stopwatchTargetMinutes, setStopwatchTargetMinutes] = useState(0);
 
   const handleStartWorkday = () => {
     startWorkday(startInput);
@@ -55,36 +60,42 @@ export default function App() {
   const pomodoroLimit =
     state.pomodoroPhase === "focus" ? 25 * 60 : 5 * 60;
   const pomodoroProgress = Math.min(pomodoroElapsedDisplay / pomodoroLimit, 1);
-
-  // SUBSTITUA POR:
   const lunchRemaining = Math.max(0, state.workday.lunchDuration * 60 - state.lunchElapsed);
   const remaining = Math.max(0, state.workday.totalWork * 60 - state.workdayElapsed) + lunchRemaining;
-  // const remaining = state.workday.totalWork * 60 - state.workdayElapsed;
+  const workdaySecondary = workdayStarted
+    ? state.workdayComplete
+      ? "Jornada 100% concluida"
+      : state.isOnLunch
+      ? `Jornada em pausa (almoco ${Math.round(lunchProgress * 100)}%)`
+      : `Jornada ${Math.round(workProgress * 100)}% • falta ${formatTimeHM(Math.max(0, remaining))}`
+    : "Sem jornada ativa";
+  const primaryStatusText =
+    state.mode === "pomodoro"
+      ? `${state.pomodoroPhase === "focus" ? "Pomodoro foco" : "Pomodoro pausa"} • ${formatTime(
+          Math.max(0, pomodoroLimit - pomodoroElapsedDisplay),
+          false
+        )}`
+      : state.mode === "stopwatch"
+      ? `Cronometro • ${
+          state.stopwatchTargetSeconds > 0
+            ? `restante ${formatTime(stopwatchRemainingDisplay)}`
+            : formatTime(stopwatchElapsedDisplay)
+        }`
+      : state.workdayComplete
+      ? "Jornada concluida"
+      : state.isOnLunch
+      ? `Almoco • ${formatTime(state.lunchElapsed)}`
+      : `Jornada ativa • ${formatTime(state.workdayElapsed)}`;
+  const topStatusText = `${primaryStatusText} • ${workdaySecondary}`;
 
   useEffect(() => {
-    let title = "FocusBar";
-
-    if (state.mode === "workday" && workdayStarted) {
-      const progress = Math.round(workProgress * 100);
-      if (state.workdayComplete) {
-        title = "FocusBar • Jornada completa (100%)";
-      } else if (state.isOnLunch) {
-        title = `FocusBar • Almoco ${formatTime(state.lunchElapsed)} (${Math.round(lunchProgress * 100)}%)`;
-      } else {
-        title = `FocusBar • Jornada ${formatTime(state.workdayElapsed)} (${progress}%)`;
-      }
-    } else if (state.mode === "pomodoro") {
-      const limit = state.pomodoroPhase === "focus" ? 25 * 60 : 5 * 60;
-      const elapsed = pomodoroElapsedDisplay;
-      const remainingPomo = Math.max(0, limit - elapsed);
-      const phaseLabel = state.pomodoroPhase === "focus" ? "Foco" : "Pausa";
-      title = `FocusBar • ${phaseLabel} -${formatTime(remainingPomo, false)} (${Math.round((elapsed / limit) * 100)}%)`;
-    } else if (state.mode === "stopwatch") {
-      title = `FocusBar • Cronometro ${formatTime(stopwatchElapsedDisplay)}`;
-    }
-
-    invoke("update_tray_title", { title }).catch(() => {
-      // Ignora erro fora do contexto Tauri (ex.: navegador)
+    const title = `FocusBar • ${topStatusText}`;
+    invoke("update_tray_title", {
+      title,
+      always_visible: trayAlwaysVisible,
+      alwaysVisible: trayAlwaysVisible,
+    }).catch((error) => {
+      console.error("Falha ao atualizar tray:", error);
     });
   }, [
     state.mode,
@@ -98,7 +109,22 @@ export default function App() {
     workdayStarted,
     workProgress,
     lunchProgress,
+    trayAlwaysVisible,
+    topStatusText,
   ]);
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem("focusbar.tray.alwaysVisible");
+    if (savedMode === "0") {
+      setTrayAlwaysVisible(false);
+      return;
+    }
+    setTrayAlwaysVisible(true);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("focusbar.tray.alwaysVisible", trayAlwaysVisible ? "1" : "0");
+  }, [trayAlwaysVisible]);
 
 
   return (
@@ -121,6 +147,7 @@ export default function App() {
           ))}
         </div>
       </div>
+      <div className="top-status" title={topStatusText}>{topStatusText}</div>
 
       {/* WORKDAY MODE */}
       {state.mode === "workday" && (
@@ -215,13 +242,6 @@ export default function App() {
               {/* Controls */}
               <div className="controls">
                 <button
-                  className={`btn-control ${state.isRunning ? "active" : ""}`}
-                  onClick={toggleRunning}
-                  disabled={state.workdayComplete}
-                >
-                  {state.isRunning ? "⏸ Pausar" : "▶ Continuar"}
-                </button>
-                <button
                   className={`btn-control ${state.isOnLunch ? "lunch-active" : ""}`}
                   onClick={toggleLunch}
                   disabled={state.workdayComplete}
@@ -303,7 +323,42 @@ export default function App() {
         <div className="panel">
           <div className="stopwatch-label">CRONÔMETRO</div>
           <div className="stopwatch-display">
-            {formatTime(stopwatchElapsedDisplay)}
+            {state.stopwatchTargetSeconds > 0
+              ? formatTime(stopwatchRemainingDisplay)
+              : formatTime(stopwatchElapsedDisplay)}
+          </div>
+          {state.stopwatchTargetSeconds > 0 && (
+            <div className="ring-remaining">
+              decorrido {formatTime(stopwatchElapsedDisplay)}
+            </div>
+          )}
+          <div className="setup-row">
+            <input
+              type="number"
+              min={0}
+              value={stopwatchRetroMinutes}
+              onChange={(e) => setStopwatchRetroMinutes(Number(e.target.value) || 0)}
+              placeholder="Retroativo (min)"
+            />
+            <input
+              type="number"
+              min={0}
+              value={stopwatchTargetMinutes}
+              onChange={(e) => setStopwatchTargetMinutes(Number(e.target.value) || 0)}
+              placeholder="Meta restante (min)"
+            />
+            <button
+              className="btn-ghost"
+              onClick={() =>
+                configureStopwatch(
+                  stopwatchRetroMinutes * 60,
+                  stopwatchTargetMinutes * 60,
+                  true
+                )
+              }
+            >
+              Aplicar
+            </button>
           </div>
           <div className="controls">
             <button
@@ -332,6 +387,15 @@ export default function App() {
             ? `#${state.pomodoroCount + 1}`
             : ""}
         </span>
+        <span className="footer-sep">·</span>
+        <label className="footer-toggle">
+          <input
+            type="checkbox"
+            checked={trayAlwaysVisible}
+            onChange={(e) => setTrayAlwaysVisible(e.target.checked)}
+          />
+          Tray sempre visível
+        </label>
       </div>
     </div>
   );
