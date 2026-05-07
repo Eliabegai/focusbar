@@ -9,9 +9,14 @@ e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 - Painel lateral de configurações para jornada, visibilidade de campos e almoço.
+- Exibição da versão atual do app no footer (alinhada à direita, na linha de horário/jornada).
+- Script `scripts/sync-version.mjs` para sincronizar versão entre `package.json` e `src-tauri/tauri.conf.json`.
+- Documentação de versionamento em `docs/versionamento.md`.
 
 ### Changed
 - Fluxo de configuração da v1 consolidado em `FEATURES.md`.
+- `README.md` atualizado com seção de versionamento.
+- `package.json` com scripts de versionamento e build de release (`version:*`, `version:sync`, `release:build`).
 
 ## [0.1.0] - 2026-05-07
 
