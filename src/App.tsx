@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTimer, formatTime, formatTimeHM, Mode } from "./useTimer";
 import { invoke } from "@tauri-apps/api/tauri";
 import { getVersion } from "@tauri-apps/api/app";
+import { appWindow, LogicalSize } from "@tauri-apps/api/window";
 import "./App.css";
 
 function getCurrentTime(): string {
@@ -227,6 +228,22 @@ export default function App() {
       .then((version) => setAppVersion(version))
       .catch(() => setAppVersion("n/a"));
   }, []);
+
+  useEffect(() => {
+    const getTargetHeight = () => {
+      if (settingsOpen) return 700;
+      if (state.mode === "workday") {
+        return workdayStarted ? 650 : 500;
+      }
+      if (state.mode === "pomodoro") return 500;
+      return 520;
+    };
+
+    const targetHeight = getTargetHeight();
+    appWindow
+      .setSize(new LogicalSize(430, targetHeight))
+      .catch((error) => console.error("Falha ao ajustar tamanho da janela:", error));
+  }, [state.mode, workdayStarted, settingsOpen]);
 
 
   return (

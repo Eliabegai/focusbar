@@ -20,6 +20,8 @@ e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - `package.json` com scripts de versionamento e build de release (`version:*`, `version:sync`, `release:build`).
 - Timer Pomodoro agora usa durações configuráveis em vez de valores fixos (25/5).
 - Notificações do Pomodoro exibem os minutos configurados.
+- Janela agora ajusta altura dinamicamente por modo (Jornada/Pomodoro/Cronômetro/Config).
+- Configuração de janela Tauri ajustada para evitar espaço vazio (`height` e `minHeight` menores).
 
 ## [0.1.0] - 2026-05-07
 

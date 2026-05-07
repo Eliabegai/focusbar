@@ -6,9 +6,9 @@
 
 * [x] Mostrar ou ocultar campo do almoço;
 
-* [ ] Modo pomodoro conseguir definir o tempo de foco e de descanso;
+* [x] Modo pomodoro conseguir definir o tempo de foco e de descanso;
 
-* [ ] Pomodoro, emitir um alerta ou alguma maneira de mostrar que acabou o tempo de foco e é para descanso;
+* [x] Pomodoro, emitir um alerta ou alguma maneira de mostrar que acabou o tempo de foco e é para descanso;
 
 * [x] Essas criar uma tela de configuração;
   * [x] Ver melhor tratativa, se modal ou uma aba ao lado do restante;
