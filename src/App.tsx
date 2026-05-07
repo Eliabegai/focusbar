@@ -30,6 +30,7 @@ export default function App() {
     resetPomodoro,
     resetStopwatch,
     configureStopwatch,
+    updateWorkdayConfig,
   } = useTimer();
 
   const [startInput, setStartInput] = useState(getCurrentTime());
@@ -38,11 +39,51 @@ export default function App() {
   const [stopwatchRetroMinutes, setStopwatchRetroMinutes] = useState(0);
   const [stopwatchTargetMinutes, setStopwatchTargetMinutes] = useState(0);
   const [workdayEndInput, setWorkdayEndInput] = useState(getCurrentTime());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workdayHoursInput, setWorkdayHoursInput] = useState(
+    String(Math.floor(state.workday.totalWork / 60))
+  );
+  const [workdayMinutesInput, setWorkdayMinutesInput] = useState(
+    String(state.workday.totalWork % 60)
+  );
+  const [settingsError, setSettingsError] = useState("");
+  const [visibleFields, setVisibleFields] = useState({
+    topStatus: true,
+    exitForecast: true,
+    workProgress: true,
+    footerInfo: true,
+  });
+  const [showLunchField, setShowLunchField] = useState(state.workday.lunchDuration > 0);
 
   const handleStartWorkday = () => {
     startWorkday(startInput);
     setWorkdayStarted(true);
     setWorkdayEndInput(getCurrentTime());
+  };
+
+  const applySettings = () => {
+    const safeHours = Number(workdayHoursInput);
+    const safeMinutes = Number(workdayMinutesInput);
+    if (!Number.isFinite(safeHours) || !Number.isFinite(safeMinutes)) {
+      setSettingsError("Informe horas e minutos válidos.");
+      return;
+    }
+    if (safeHours < 0 || safeMinutes < 0 || safeMinutes > 59) {
+      setSettingsError("Use horas >= 0 e minutos entre 0 e 59.");
+      return;
+    }
+
+    const totalMinutes = safeHours * 60 + safeMinutes;
+    if (totalMinutes < 30 || totalMinutes > 960) {
+      setSettingsError("A jornada deve ficar entre 30 min e 16h.");
+      return;
+    }
+
+    setSettingsError("");
+    updateWorkdayConfig({
+      totalWork: totalMinutes,
+      lunchDuration: showLunchField ? 60 : 0,
+    });
   };
 
   function calcExitTime(
@@ -167,19 +208,32 @@ export default function App() {
           <span className="logo-dot" />
           <span className="logo-text">focusbar</span>
         </div>
-        <div className="mode-tabs">
-          {(["workday", "pomodoro", "stopwatch"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              className={`tab ${state.mode === m ? "active" : ""} tab-${m}`}
-              onClick={() => setMode(m)}
-            >
-              {m === "workday" ? "Jornada" : m === "pomodoro" ? "Pomodoro" : "Crônom."}
-            </button>
-          ))}
+        <div className="header-actions">
+          <div className="mode-tabs">
+            {(["workday", "pomodoro", "stopwatch"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                className={`tab ${state.mode === m ? "active" : ""} tab-${m}`}
+                onClick={() => setMode(m)}
+              >
+                {m === "workday" ? "Jornada" : m === "pomodoro" ? "Pomodoro" : "Crônom."}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className={`settings-btn ${settingsOpen ? "active" : ""}`}
+            onClick={() => setSettingsOpen((prev) => !prev)}
+          >
+            Config
+          </button>
         </div>
       </div>
-      <div className="top-status" title={topStatusText}>{topStatusText}</div>
+      {visibleFields.topStatus && (
+        <div className="top-status" title={topStatusText}>
+          {topStatusText}
+        </div>
+      )}
 
       {/* WORKDAY MODE */}
       {state.mode === "workday" && (
@@ -223,7 +277,7 @@ export default function App() {
                 </div>
               </div>
 
-              {!state.workdayComplete && (
+              {!state.workdayComplete && visibleFields.exitForecast && (
                 <div className="exit-time">
                   <span className="exit-label">SAÍDA PREVISTA</span>
                   <span className="exit-value">
@@ -237,30 +291,33 @@ export default function App() {
               )}
 
               {/* Progress bar - work */}
-              <div className="progress-block">
-                <div className="progress-header">
-                  <span className="progress-name">Jornada</span>
-                  <span className="progress-val">
-                    {formatTimeHM(state.workdayElapsed)} / {formatTimeHM(state.workday.totalWork * 60)}
-                  </span>
+              {visibleFields.workProgress && (
+                <div className="progress-block">
+                  <div className="progress-header">
+                    <span className="progress-name">Jornada</span>
+                    <span className="progress-val">
+                      {formatTimeHM(state.workdayElapsed)} / {formatTimeHM(state.workday.totalWork * 60)}
+                    </span>
+                  </div>
+                  <div className="progress-track">
+                    <div
+                      className="progress-fill work"
+                      style={{ width: `${workProgress * 100}%` }}
+                    />
+                  </div>
+                  <div className="progress-footer">
+                    <span className="dim">
+                      {state.workdayComplete
+                        ? "✓ Completo!"
+                        : `faltam ${formatTimeHM(Math.max(0, remaining))}`}
+                    </span>
+                  </div>
                 </div>
-                <div className="progress-track">
-                  <div
-                    className="progress-fill work"
-                    style={{ width: `${workProgress * 100}%` }}
-                  />
-                </div>
-                <div className="progress-footer">
-                  <span className="dim">
-                    {state.workdayComplete
-                      ? "✓ Completo!"
-                      : `faltam ${formatTimeHM(Math.max(0, remaining))}`}
-                  </span>
-                </div>
-              </div>
+              )}
 
               {/* Progress bar - lunch */}
-              <div className="progress-block">
+              {showLunchField && (
+                <div className="progress-block">
                 <div className="progress-header">
                   <span className="progress-name">Almoço</span>
                   <span className="progress-val">
@@ -291,7 +348,8 @@ export default function App() {
                     </label>
                   )}
                 </div>
-              </div>
+                </div>
+              )}
 
               {!state.workdayComplete && (
                 <div className="workday-tracking-panel">
@@ -338,13 +396,15 @@ export default function App() {
 
               {/* Controls */}
               <div className="controls">
-                <button
-                  className={`btn-control ${state.isOnLunch ? "lunch-active" : ""}`}
-                  onClick={toggleLunch}
-                  disabled={state.workdayComplete || state.workdayFrozen}
-                >
-                  {state.isOnLunch ? "✓ Voltei" : "🍽 Almoço"}
-                </button>
+                {showLunchField && (
+                  <button
+                    className={`btn-control ${state.isOnLunch ? "lunch-active" : ""}`}
+                    onClick={toggleLunch}
+                    disabled={state.workdayComplete || state.workdayFrozen}
+                  >
+                    {state.isOnLunch ? "✓ Voltei" : "🍽 Almoço"}
+                  </button>
+                )}
                 <button
                   className="btn-ghost"
                   onClick={() => { setWorkdayStarted(false); setMode("workday"); }}
@@ -475,17 +535,19 @@ export default function App() {
       <div className="footer">
         <LiveClock />
         <span className="footer-sep">·</span>
-        <span className="footer-dim">
-          {state.mode === "workday" && workdayStarted
-            ? state.workdayComplete
-              ? "✓ Jornada ok"
-              : state.workdayFrozen
-              ? "⏸ Contagem pausada"
-              : `${Math.round(workProgress * 100)}% da jornada`
-            : state.mode === "pomodoro"
-            ? `#${state.pomodoroCount + 1}`
-            : ""}
-        </span>
+        {visibleFields.footerInfo && (
+          <span className="footer-dim">
+            {state.mode === "workday" && workdayStarted
+              ? state.workdayComplete
+                ? "✓ Jornada ok"
+                : state.workdayFrozen
+                ? "⏸ Contagem pausada"
+                : `${Math.round(workProgress * 100)}% da jornada`
+              : state.mode === "pomodoro"
+              ? `#${state.pomodoroCount + 1}`
+              : ""}
+          </span>
+        )}
         <span className="footer-sep">·</span>
         <label className="footer-toggle">
           <input
@@ -496,6 +558,107 @@ export default function App() {
           Tray sempre visível
         </label>
       </div>
+
+      {settingsOpen && (
+        <aside className="settings-panel">
+          <div className="settings-head">
+            <h3>Configurações</h3>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setSettingsOpen(false)}
+            >
+              Fechar
+            </button>
+          </div>
+
+          <div className="settings-group">
+            <p className="settings-label">Jornada desejada</p>
+            <div className="settings-time-row">
+              <input
+                type="number"
+                min={0}
+                max={16}
+                value={workdayHoursInput}
+                onChange={(e) => setWorkdayHoursInput(e.target.value)}
+                aria-label="Horas de jornada"
+              />
+              <span>h</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                value={workdayMinutesInput}
+                onChange={(e) => setWorkdayMinutesInput(e.target.value)}
+                aria-label="Minutos de jornada"
+              />
+              <span>min</span>
+            </div>
+          </div>
+
+          <div className="settings-group">
+            <p className="settings-label">Campos visíveis</p>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={visibleFields.topStatus}
+                onChange={(e) =>
+                  setVisibleFields((prev) => ({ ...prev, topStatus: e.target.checked }))
+                }
+              />
+              Status superior
+            </label>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={visibleFields.exitForecast}
+                onChange={(e) =>
+                  setVisibleFields((prev) => ({ ...prev, exitForecast: e.target.checked }))
+                }
+              />
+              Saída prevista
+            </label>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={visibleFields.workProgress}
+                onChange={(e) =>
+                  setVisibleFields((prev) => ({ ...prev, workProgress: e.target.checked }))
+                }
+              />
+              Progresso da jornada
+            </label>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={visibleFields.footerInfo}
+                onChange={(e) =>
+                  setVisibleFields((prev) => ({ ...prev, footerInfo: e.target.checked }))
+                }
+              />
+              Resumo no rodapé
+            </label>
+          </div>
+
+          <div className="settings-group">
+            <p className="settings-label">Almoço</p>
+            <label className="settings-check">
+              <input
+                type="checkbox"
+                checked={showLunchField}
+                onChange={(e) => setShowLunchField(e.target.checked)}
+              />
+              Mostrar campo de almoço
+            </label>
+          </div>
+
+          {settingsError && <p className="settings-error">{settingsError}</p>}
+
+          <button type="button" className="btn-primary settings-apply" onClick={applySettings}>
+            Aplicar configurações
+          </button>
+        </aside>
+      )}
     </div>
   );
 }
