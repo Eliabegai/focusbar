@@ -22,6 +22,11 @@ e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Notificações do Pomodoro exibem os minutos configurados.
 - Janela agora ajusta altura dinamicamente por modo (Jornada/Pomodoro/Cronômetro/Config).
 - Configuração de janela Tauri ajustada para evitar espaço vazio (`height` e `minHeight` menores).
+- Pomodoro agora exibe contagem regressiva por fase (foco e descanso), com texto de estado `em andamento`/`pausado`.
+- Troca de fase atualizada para `FOCO` / `DESCANSO` também no status principal.
+- Contador de completos agora soma 1 ciclo apenas após concluir `foco + descanso`.
+- Tray title no macOS agora destaca fase com prefixo visual (`🔴` no foco, `☕` no descanso).
+- UI recebe destaque visual adicional durante fase de descanso.
 
 ## [0.1.0] - 2026-05-07
 

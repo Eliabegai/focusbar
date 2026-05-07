@@ -163,10 +163,9 @@ export default function App() {
     : "Sem jornada ativa";
   const primaryStatusText =
     state.mode === "pomodoro"
-      ? `${state.pomodoroPhase === "focus" ? "Pomodoro foco" : "Pomodoro pausa"} • ${formatTime(
-          Math.max(0, pomodoroLimit - pomodoroElapsedDisplay),
-          false
-        )}`
+      ? `${state.pomodoroPhase === "focus" ? "Pomodoro foco" : "Pomodoro descanso"} ${
+          state.isRunning ? "em andamento" : "pausado"
+        } • ${formatTime(Math.max(0, pomodoroLimit - pomodoroElapsedDisplay), false)}`
       : state.mode === "stopwatch"
       ? `Cronometro • ${
           state.stopwatchTargetSeconds > 0
@@ -183,7 +182,9 @@ export default function App() {
   const topStatusText = `${primaryStatusText} • ${workdaySecondary}`;
 
   useEffect(() => {
-    const title = `FocusBar • ${topStatusText}`;
+    const trayPrefix =
+      state.mode === "pomodoro" ? (state.pomodoroPhase === "break" ? "☕ " : "🔴 ") : "";
+    const title = `${trayPrefix}FocusBar • ${topStatusText}`;
     invoke("update_tray_title", {
       title,
       always_visible: trayAlwaysVisible,
@@ -193,6 +194,7 @@ export default function App() {
     });
   }, [
     state.mode,
+    state.isRunning,
     state.workdayElapsed,
     state.lunchElapsed,
     state.lunchDoneManual,
@@ -202,6 +204,7 @@ export default function App() {
     state.isOnLunch,
     pomodoroElapsedDisplay,
     state.pomodoroPhase,
+    state.pomodoroCount,
     stopwatchElapsedDisplay,
     workdayStarted,
     workProgress,
@@ -247,7 +250,10 @@ export default function App() {
 
 
   return (
-    <div className="app" data-tauri-drag-region>
+    <div
+      className={`app ${state.mode === "pomodoro" && state.pomodoroPhase === "break" ? "app-pomodoro-break" : ""}`}
+      data-tauri-drag-region
+    >
       {/* Header */}
       <div className="header" data-tauri-drag-region>
         <div className="logo">
@@ -467,10 +473,13 @@ export default function App() {
       {state.mode === "pomodoro" && (
         <div className="panel">
           <div className={`pomo-phase-badge ${state.pomodoroPhase}`}>
-            {state.pomodoroPhase === "focus" ? "🍅 FOCO" : "☕ PAUSA"}
+            {state.pomodoroPhase === "focus" ? "🔴 FOCO" : "☕ DESCANSO"}
           </div>
           <div className="pomo-config-summary">
             {Math.floor(state.pomodoroFocusSeconds / 60)} min foco · {Math.floor(state.pomodoroBreakSeconds / 60)} min pausa
+          </div>
+          <div className="pomo-run-state">
+            {state.isRunning ? "Em andamento" : "Pausado"}
           </div>
 
           {/* Ring timer */}
@@ -495,10 +504,10 @@ export default function App() {
               />
             </svg>
             <div className="ring-time">
-              {formatTime(pomodoroElapsedDisplay, false)}
+              {formatTime(Math.max(0, pomodoroLimit - pomodoroElapsedDisplay), false)}
             </div>
             <div className="ring-remaining">
-              -{formatTime(Math.max(0, pomodoroLimit - pomodoroElapsedDisplay), false)} restando
+              decorrido {formatTime(pomodoroElapsedDisplay, false)}
             </div>
           </div>
 
@@ -507,7 +516,7 @@ export default function App() {
               <span key={i} className="pomo-dot done" />
             ))}
             {state.pomodoroCount < 8 && <span className="pomo-dot current" />}
-            <span className="pomo-count-label">{state.pomodoroCount} completos</span>
+            <span className="pomo-count-label">{state.pomodoroCount} ciclos completos</span>
           </div>
 
           <div className="controls">

@@ -11,6 +11,11 @@
   position: relative;
 }
 
+.app.app-pomodoro-break {
+  border-color: rgba(95, 170, 255, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(95, 170, 255, 0.15);
+}
+
 /* ── HEADER ── */
 .header {
   display: flex;
@@ -489,6 +494,14 @@
   color: var(--text-dim);
   letter-spacing: 0.04em;
   margin-top: -2px;
+}
+
+.pomo-run-state {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-mid);
+  letter-spacing: 0.04em;
+  margin-top: -6px;
 }
 
 /* ── STOPWATCH ── */

@@ -265,7 +265,7 @@ export function useTimer() {
           const newPhase: PomodoroPhase =
             prev.pomodoroPhase === "focus" ? "break" : "focus";
           const newCount =
-            prev.pomodoroPhase === "focus"
+            prev.pomodoroPhase === "break"
               ? prev.pomodoroCount + 1
               : prev.pomodoroCount;
           setTimeout(() => {
@@ -285,8 +285,8 @@ export function useTimer() {
                 Math.round(prev.pomodoroFocusSeconds / 60)
               );
               notify(
-                "✅ Pausa encerrada!",
-                `Bora focar por mais ${focusMinutes} min.`,
+                "✅ Descanso encerrado!",
+                `Ciclo completo #${newCount}. Bora focar por mais ${focusMinutes} min.`,
                 `pomo-focus-${newCount}`
               );
             }

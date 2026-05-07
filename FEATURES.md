@@ -46,3 +46,11 @@
 * Implementar modo Pomodoro:
   * Definir tempo de foco;
   * Definir tempo de descanso.
+
+### Ideias extras (sugeridas)
+
+* [ ] Persistir contagem de ciclos Pomodoro do dia e resetar automaticamente na virada de data;
+* [ ] Histórico de sessões (foco/descanso) com total por dia;
+* [ ] Atalhos de teclado globais: iniciar/pausar e pular fase;
+* [ ] Opção de som personalizado por fase (fim de foco e fim de descanso);
+* [ ] Intervalo longo opcional após N ciclos completos (ex.: 15 min a cada 4 ciclos).
