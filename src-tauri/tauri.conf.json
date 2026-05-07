@@ -15,8 +15,13 @@
     "macOSPrivateApi": true,
     "allowlist": {
       "all": false,
-      "shell": { "all": false, "open": true },
-      "notification": { "all": true },
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "notification": {
+        "all": true
+      },
       "window": {
         "all": true
       }

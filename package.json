@@ -6,7 +6,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "version:sync": "node ./scripts/sync-version.mjs",
+    "version:patch": "npm version patch && npm run version:sync",
+    "version:minor": "npm version minor && npm run version:sync",
+    "version:major": "npm version major && npm run version:sync",
+    "release:build": "npm run build && npm run tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.5.0",

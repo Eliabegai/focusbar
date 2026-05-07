@@ -65,6 +65,20 @@ npm run tauri build
 
 ---
 
+## Versionamento
+
+Use os scripts de versão para manter `package.json` e `src-tauri/tauri.conf.json` sincronizados:
+
+```bash
+npm run version:patch  # bugfix
+npm run version:minor  # feature
+npm run version:major  # breaking change
+```
+
+Guia completo: `docs/versionamento.md`
+
+---
+
 ## Ícones
 
 Antes de fazer o build final, gere os ícones:
