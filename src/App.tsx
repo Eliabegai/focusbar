@@ -164,7 +164,7 @@ export default function App() {
   const primaryStatusText =
     state.mode === "pomodoro"
       ? `${state.pomodoroPhase === "focus" ? "Pomodoro foco" : "Pomodoro descanso"} ${
-          state.isRunning ? "em andamento" : "pausado"
+          state.pomodoroIsRunning ? "em andamento" : "pausado"
         } • ${formatTime(Math.max(0, pomodoroLimit - pomodoroElapsedDisplay), false)}`
       : state.mode === "stopwatch"
       ? `Cronometro • ${
@@ -194,7 +194,7 @@ export default function App() {
     });
   }, [
     state.mode,
-    state.isRunning,
+    state.pomodoroIsRunning,
     state.workdayElapsed,
     state.lunchElapsed,
     state.lunchDoneManual,
@@ -479,7 +479,7 @@ export default function App() {
             {Math.floor(state.pomodoroFocusSeconds / 60)} min foco · {Math.floor(state.pomodoroBreakSeconds / 60)} min pausa
           </div>
           <div className="pomo-run-state">
-            {state.isRunning ? "Em andamento" : "Pausado"}
+            {state.pomodoroIsRunning ? "Em andamento" : "Pausado"}
           </div>
 
           {/* Ring timer */}
@@ -521,10 +521,10 @@ export default function App() {
 
           <div className="controls">
             <button
-              className={`btn-control pomo ${state.isRunning ? "active" : ""}`}
+              className={`btn-control pomo ${state.pomodoroIsRunning ? "active" : ""}`}
               onClick={toggleRunning}
             >
-              {state.isRunning ? "⏸ Pausar" : "▶ Iniciar"}
+              {state.pomodoroIsRunning ? "⏸ Pausar" : "▶ Iniciar"}
             </button>
             <button className="btn-ghost" onClick={resetPomodoro}>
               Resetar

@@ -27,6 +27,7 @@ e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Contador de completos agora soma 1 ciclo apenas após concluir `foco + descanso`.
 - Tray title no macOS agora destaca fase com prefixo visual (`🔴` no foco, `☕` no descanso).
 - UI recebe destaque visual adicional durante fase de descanso.
+- Pomodoro passa a continuar rodando ao trocar de aba, sem resetar estado/contagem ao voltar.
 
 ## [0.1.0] - 2026-05-07
 
