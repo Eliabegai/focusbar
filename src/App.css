@@ -535,6 +535,14 @@
   min-width: 120px;
 }
 
+.footer-version {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
 .footer-toggle {
   display: inline-flex;
   align-items: center;

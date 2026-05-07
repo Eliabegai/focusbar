@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTimer, formatTime, formatTimeHM, Mode } from "./useTimer";
 import { invoke } from "@tauri-apps/api/tauri";
+import { getVersion } from "@tauri-apps/api/app";
 import "./App.css";
 
 function getCurrentTime(): string {
@@ -54,6 +55,7 @@ export default function App() {
     footerInfo: true,
   });
   const [showLunchField, setShowLunchField] = useState(state.workday.lunchDuration > 0);
+  const [appVersion, setAppVersion] = useState("...");
 
   const handleStartWorkday = () => {
     startWorkday(startInput);
@@ -198,6 +200,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("focusbar.tray.alwaysVisible", trayAlwaysVisible ? "1" : "0");
   }, [trayAlwaysVisible]);
+
+  useEffect(() => {
+    getVersion()
+      .then((version) => setAppVersion(version))
+      .catch(() => setAppVersion("n/a"));
+  }, []);
 
 
   return (
@@ -548,6 +556,9 @@ export default function App() {
               : ""}
           </span>
         )}
+        <span className="footer-version" title={`Versão ${appVersion}`}>
+          v{appVersion}
+        </span>
         <span className="footer-sep">·</span>
         <label className="footer-toggle">
           <input
