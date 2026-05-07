@@ -33,14 +33,16 @@ export interface TimerState {
   pomodoroSessionStart: number | null; // timestamp real do início da sessão atual
   pomodoroBaseElapsed: number;         // elapsed acumulado antes de pausar
   pomodoroCount: number;
+  pomodoroFocusSeconds: number;
+  pomodoroBreakSeconds: number;
   // Stopwatch
   stopwatchBaseElapsed: number;        // elapsed acumulado antes de pausar
   stopwatchSessionStart: number | null; // timestamp real do início
   stopwatchTargetSeconds: number; // 0 = sem regressivo
 }
 
-const POMODORO_FOCUS = 25 * 60;
-const POMODORO_BREAK = 5 * 60;
+const DEFAULT_POMODORO_FOCUS = 25 * 60;
+const DEFAULT_POMODORO_BREAK = 5 * 60;
 
 // Calcula elapsed real de trabalho desde o início, descontando almoços já tirados
 function calcWorkElapsed(
@@ -133,6 +135,8 @@ export function useTimer() {
     pomodoroSessionStart: null,
     pomodoroBaseElapsed: 0,
     pomodoroCount: 0,
+    pomodoroFocusSeconds: DEFAULT_POMODORO_FOCUS,
+    pomodoroBreakSeconds: DEFAULT_POMODORO_BREAK,
     stopwatchBaseElapsed: 0,
     stopwatchSessionStart: null,
     stopwatchTargetSeconds: 0,
@@ -253,7 +257,9 @@ export function useTimer() {
           prev.pomodoroBaseElapsed +
           Math.floor((Date.now() - prev.pomodoroSessionStart) / 1000);
         const limit =
-          prev.pomodoroPhase === "focus" ? POMODORO_FOCUS : POMODORO_BREAK;
+          prev.pomodoroPhase === "focus"
+            ? prev.pomodoroFocusSeconds
+            : prev.pomodoroBreakSeconds;
 
         if (elapsed >= limit) {
           const newPhase: PomodoroPhase =
@@ -264,15 +270,23 @@ export function useTimer() {
               : prev.pomodoroCount;
           setTimeout(() => {
             if (newPhase === "break") {
+              const breakMinutes = Math.max(
+                1,
+                Math.round(prev.pomodoroBreakSeconds / 60)
+              );
               notify(
                 "🍅 Pomodoro completo!",
-                "Hora de descansar 5 minutos.",
+                `Hora de descansar ${breakMinutes} minutos.`,
                 `pomo-break-${newCount}`
               );
             } else {
+              const focusMinutes = Math.max(
+                1,
+                Math.round(prev.pomodoroFocusSeconds / 60)
+              );
               notify(
                 "✅ Pausa encerrada!",
-                "Bora focar por mais 25 min.",
+                `Bora focar por mais ${focusMinutes} min.`,
                 `pomo-focus-${newCount}`
               );
             }
@@ -542,6 +556,21 @@ export function useTimer() {
     }));
   }, []);
 
+  const updatePomodoroConfig = useCallback(
+    (focusSeconds: number, breakSeconds: number) => {
+      const safeFocus = Math.max(60, Math.floor(focusSeconds));
+      const safeBreak = Math.max(60, Math.floor(breakSeconds));
+      setState((prev) => ({
+        ...prev,
+        pomodoroFocusSeconds: safeFocus,
+        pomodoroBreakSeconds: safeBreak,
+        pomodoroBaseElapsed: 0,
+        pomodoroSessionStart: prev.isRunning && prev.mode === "pomodoro" ? Date.now() : null,
+      }));
+    },
+    []
+  );
+
   // Computed: elapsed real para exibição
   const pomodoroElapsedDisplay =
     state.isRunning && state.pomodoroSessionStart
@@ -572,6 +601,7 @@ export function useTimer() {
     resetStopwatch,
     configureStopwatch,
     updateWorkdayConfig,
+    updatePomodoroConfig,
     toggleLunchDoneManual,
     freezeWorkdayTracking,
     resumeWorkdayTracking,

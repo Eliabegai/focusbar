@@ -32,6 +32,7 @@ export default function App() {
     resetStopwatch,
     configureStopwatch,
     updateWorkdayConfig,
+    updatePomodoroConfig,
   } = useTimer();
 
   const [startInput, setStartInput] = useState(getCurrentTime());
@@ -56,6 +57,12 @@ export default function App() {
   });
   const [showLunchField, setShowLunchField] = useState(state.workday.lunchDuration > 0);
   const [appVersion, setAppVersion] = useState("...");
+  const [pomodoroFocusMinutesInput, setPomodoroFocusMinutesInput] = useState(
+    String(Math.floor(state.pomodoroFocusSeconds / 60))
+  );
+  const [pomodoroBreakMinutesInput, setPomodoroBreakMinutesInput] = useState(
+    String(Math.floor(state.pomodoroBreakSeconds / 60))
+  );
 
   const handleStartWorkday = () => {
     startWorkday(startInput);
@@ -81,11 +88,23 @@ export default function App() {
       return;
     }
 
+    const safePomoFocus = Number(pomodoroFocusMinutesInput);
+    const safePomoBreak = Number(pomodoroBreakMinutesInput);
+    if (!Number.isFinite(safePomoFocus) || !Number.isFinite(safePomoBreak)) {
+      setSettingsError("Pomodoro: informe minutos válidos para foco e pausa.");
+      return;
+    }
+    if (safePomoFocus < 1 || safePomoFocus > 180 || safePomoBreak < 1 || safePomoBreak > 60) {
+      setSettingsError("Pomodoro: foco 1-180 min e pausa 1-60 min.");
+      return;
+    }
+
     setSettingsError("");
     updateWorkdayConfig({
       totalWork: totalMinutes,
       lunchDuration: showLunchField ? 60 : 0,
     });
+    updatePomodoroConfig(safePomoFocus * 60, safePomoBreak * 60);
   };
 
   function calcExitTime(
@@ -122,7 +141,9 @@ export default function App() {
     : state.lunchElapsed;
 
   const pomodoroLimit =
-    state.pomodoroPhase === "focus" ? 25 * 60 : 5 * 60;
+    state.pomodoroPhase === "focus"
+      ? state.pomodoroFocusSeconds
+      : state.pomodoroBreakSeconds;
   const pomodoroProgress = Math.min(pomodoroElapsedDisplay / pomodoroLimit, 1);
   const lunchRemaining = lunchDoneEffective
     ? 0
@@ -431,6 +452,9 @@ export default function App() {
           <div className={`pomo-phase-badge ${state.pomodoroPhase}`}>
             {state.pomodoroPhase === "focus" ? "🍅 FOCO" : "☕ PAUSA"}
           </div>
+          <div className="pomo-config-summary">
+            {Math.floor(state.pomodoroFocusSeconds / 60)} min foco · {Math.floor(state.pomodoroBreakSeconds / 60)} min pausa
+          </div>
 
           {/* Ring timer */}
           <div className="ring-wrapper">
@@ -661,6 +685,30 @@ export default function App() {
               />
               Mostrar campo de almoço
             </label>
+          </div>
+
+          <div className="settings-group">
+            <p className="settings-label">Pomodoro</p>
+            <div className="settings-time-row">
+              <input
+                type="number"
+                min={1}
+                max={180}
+                value={pomodoroFocusMinutesInput}
+                onChange={(e) => setPomodoroFocusMinutesInput(e.target.value)}
+                aria-label="Minutos de foco pomodoro"
+              />
+              <span>foco</span>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={pomodoroBreakMinutesInput}
+                onChange={(e) => setPomodoroBreakMinutesInput(e.target.value)}
+                aria-label="Minutos de pausa pomodoro"
+              />
+              <span>pausa</span>
+            </div>
           </div>
 
           {settingsError && <p className="settings-error">{settingsError}</p>}

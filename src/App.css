@@ -483,6 +483,14 @@
   letter-spacing: 0.04em;
 }
 
+.pomo-config-summary {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-top: -2px;
+}
+
 /* ── STOPWATCH ── */
 .stopwatch-label {
   font-size: 9px;
